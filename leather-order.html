@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>가죽공방 주문서</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.5 system-ui,-apple-system,"Malgun Gothic",sans-serif;background:#eceee9;color:#1d2a24}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#1d2a24;color:#fff}
+header b{font-size:18px}
+header button{background:none;border:1px solid #8aa196;color:#fff;border-radius:8px;padding:6px 10px;font-size:14px}
+.pg{padding:16px;max-width:520px;margin:0 auto;padding-bottom:90px}
+label{display:block;margin:12px 0 0;font-weight:600;font-size:15px}
+input,select,textarea{width:100%;margin-top:4px;padding:12px;font:inherit;border:1px solid #b9c2bb;border-radius:10px;background:#fff}
+.row{display:flex;gap:8px;margin-top:8px}.row input{margin:0}.row .ip{width:38%}
+.b1,.b2,.b3{display:block;width:100%;margin-top:10px;padding:14px;font:inherit;font-weight:700;border-radius:12px;border:0}
+.b1{background:#2f5d50;color:#fff}.b2{background:#fff;color:#1d2a24;border:1px solid #b9c2bb}.b3{background:#fff;color:#b3261e;border:1px solid #e3b4b0}
+.chips{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+.chip{padding:8px 14px;border-radius:20px;border:1px solid #b9c2bb;background:#fff;font:inherit;font-size:15px}
+.chip.on{background:#2f5d50;color:#fff;border-color:#2f5d50}
+.card{background:#fff;border-radius:12px;padding:14px;margin-top:10px;border-left:6px solid #b08d57}
+.card.s1{border-color:#2f5d50}.card.s2{border-color:#9aa6a0}
+.card .t{display:flex;justify-content:space-between;font-weight:700}
+.card small{color:#5b6a62}
+.fab{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:488px;background:#2f5d50;color:#fff;border:0;border-radius:14px;padding:16px;font:inherit;font-weight:700;font-size:17px}
+.rc{background:#fff;padding:22px 18px;margin-top:12px;border:2px dashed #b08d57;outline:8px solid #fff}
+.rc h3{margin:0 0 10px;font-size:19px}
+.rc table{width:100%;border-collapse:collapse}
+.rc td{padding:6px 0;border-bottom:1px solid #e4e7e2}.rc td+td{text-align:right}
+.rc .t td{font-weight:700;border-bottom:2px solid #1d2a24}
+.rc p{margin:6px 0}.rc .s{color:#5b6a62;font-size:14px;margin-top:14px}
+.login{text-align:center;padding:60px 24px}
+.empty{text-align:center;color:#5b6a62;margin-top:40px}
+</style></head><body>
+<div id="app"><div style="padding:40px 24px;text-align:center"><h2>불러오는 중...</h2><p>이 글자가 계속 보이면, 파일을 폰 미리보기가 아니라 <b>인터넷 주소(GitHub Pages)</b>로 열어주세요.</p></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,collection,addDoc,setDoc,updateDoc,deleteDoc,doc,onSnapshot,query,orderBy} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* ===== 여기에 본인 Firebase 설정을 붙여넣으세요 ===== */
+const firebaseConfig = {
+  apiKey: "AIzaSyC2wvIE0eM3XkDww5gd2NbhQjsQpmtOre8",
+  authDomain: "niji-string-b4545.firebaseapp.com",
+  projectId: "niji-string-b4545",
+  storageBucket: "niji-string-b4545.firebasestorage.app",
+  messagingSenderId: "490334989853",
+  appId: "1:490334989853:web:05c24d556b5114b4b320f4"
+};
+const SHOP="가죽공방"; // 영수증 맨 위에 나오는 가게 이름
+/* ================================================ */
+
+const ready=!firebaseConfig.apiKey.startsWith("여기");
+let auth,db;
+if(ready){const a=initializeApp(firebaseConfig);auth=getAuth(a);db=getFirestore(a)}
+const $=s=>document.querySelector(s);
+const won=n=>(+n||0).toLocaleString()+"원";
+const sum=o=>(o.items||[]).reduce((a,i)=>a+(+i.p||0),0);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const today=()=>new Date().toISOString().slice(0,10);
+const ST=["접수","작업중","완료"],TY=["시계줄 맞춤","카드지갑","지퍼수선","기타"];
+let user=null,orders=[],view="list",cur=null,filter="전체",unsub=null;
+
+if(ready)onAuthStateChanged(auth,u=>{
+  user=u;if(unsub){unsub();unsub=null}
+  if(u){unsub=onSnapshot(query(collection(db,"leatherOrders"),orderBy("created","desc")),
+    s=>{orders=s.docs.map(d=>({id:d.id,...d.data()}));render()},
+    ()=>alert("불러오기 실패. 보안 규칙에 넣은 이메일이 로그인한 구글 계정과 같은지 확인하세요."))}
+  render()});
+
+function render(){
+  const A=$("#app");
+  if(!ready){A.innerHTML=`<div class=login><h2>설정이 필요해요</h2><p>파일 위쪽의 <b>firebaseConfig</b> 부분에 Firebase 설정값을 붙여넣어 주세요.</p></div>`;return}
+  if(!user){A.innerHTML=`<div class=login><h1>${SHOP}</h1><p>주문서와 견적서 관리</p><button class=b1 onclick="login()">구글로 로그인</button></div>`;return}
+  if(view=="detail"&&cur?.id)cur=orders.find(o=>o.id==cur.id)||cur;
+  A.innerHTML=`<header><b>${SHOP}</b><button onclick="logout()">로그아웃</button></header>`+(view=="list"?list():view=="form"?form():detail());
+}
+function list(){
+  const L=orders.filter(o=>filter=="전체"||o.status==filter);
+  return `<div class=pg><div class=chips>${["전체",...ST].map(s=>`<button class="chip ${s==filter?"on":""}" onclick="setF('${s}')">${s}</button>`).join("")}</div>
+  ${L.length?L.map(o=>`<div class="card s${ST.indexOf(o.status)}" onclick="open_('${o.id}')"><div class=t><span>${esc(o.name)}</span><span>${won(sum(o))}</span></div><small>${o.type} · ${o.status}${o.due?" · 완료예정 "+o.due:""}</small></div>`).join(""):`<p class=empty>주문이 없어요. 아래 버튼으로 새 주문을 만드세요.</p>`}
+  </div><button class=fab onclick="newOrder()">+ 새 주문</button>`;
+}
+const itRow=i=>`<div class=row><input class=in placeholder="항목 (예: 시계줄 20mm)" value="${esc(i.n)}"><input class=ip type=number inputmode=numeric placeholder="금액" value="${esc(i.p)}"></div>`;
+function form(){
+  const o=cur||{};const it=o.items||[{n:"",p:""}];
+  return `<div class=pg><h2>${o.id?"주문 수정":"새 주문"}</h2>
+  <label>손님 이름<input id=fn value="${esc(o.name)}"></label>
+  <label>연락처<input id=fp type=tel inputmode=tel value="${esc(o.phone)}"></label>
+  <label>작업 종류<select id=ft>${TY.map(t=>`<option ${t==(o.type||TY[0])?"selected":""}>${t}</option>`).join("")}</select></label>
+  <label>작업 내용 메모<textarea id=fm rows=3>${esc(o.memo)}</textarea></label>
+  <label>견적 항목</label><div id=its>${it.map(itRow).join("")}</div>
+  <button class=b2 onclick="addIt()">+ 항목 추가</button>
+  <label>선금 (이미 받은 돈)<input id=fd type=number inputmode=numeric value="${esc(o.deposit)}"></label>
+  <label>접수일<input id=fr type=date value="${o.received||today()}"></label>
+  <label>완료 예정일<input id=fe type=date value="${o.due||""}"></label>
+  <button class=b1 onclick="save()">저장</button><button class=b2 onclick="go('${o.id?"detail":"list"}')">취소</button></div>`;
+}
+function text(o){const t=sum(o),d=+o.deposit||0;
+  return `[${SHOP}] ${o.name}님 ${o.type}\n`+o.items.map(i=>`- ${i.n}: ${won(i.p)}`).join("\n")+`\n합계 ${won(t)}`+(d?`\n선금 ${won(d)} / 남은 금액 ${won(t-d)}`:"")+(o.due?`\n완료예정 ${o.due}`:"")+"\n감사합니다.";}
+function detail(){
+  const o=cur,t=sum(o),d=+o.deposit||0;
+  return `<div class=pg><button class=b2 onclick="go('list')">← 목록</button>
+  <div class=chips>${ST.map(s=>`<button class="chip ${s==o.status?"on":""}" onclick="setSt('${s}')">${s}</button>`).join("")}</div>
+  <div id=rc class=rc><h3>${SHOP} 작업 견적·접수증</h3>
+  <p><b>${esc(o.name)}</b> 님<br>작업: ${o.type}<br>접수일 ${o.received}${o.due?" / 완료예정 "+o.due:""}</p>
+  ${o.memo?`<p>${esc(o.memo)}</p>`:""}
+  <table>${o.items.map(i=>`<tr><td>${esc(i.n)}</td><td>${won(i.p)}</td></tr>`).join("")}
+  <tr class=t><td>합계</td><td>${won(t)}</td></tr>
+  ${d?`<tr><td>선금</td><td>-${won(d)}</td></tr><tr class=t><td>남은 금액</td><td>${won(t-d)}</td></tr>`:""}</table>
+  <p class=s>이용해 주셔서 감사합니다.</p></div>
+  <button class=b1 onclick="shareImg()">이미지로 보내기 (카톡·문자)</button>
+  <button class=b2 onclick="shareTxt()">글로 보내기</button>
+  <button class=b2 onclick="edit()">수정</button>
+  <button class=b3 onclick="del()">삭제</button></div>`;
+}
+const F=(k,v)=>{};
+Object.assign(window,{
+  login:()=>signInWithPopup(auth,new GoogleAuthProvider()).catch(e=>alert("로그인 실패: "+e.code)),
+  logout:()=>signOut(auth),
+  go:v=>{view=v;render()},
+  setF:s=>{filter=s;render()},
+  open_:id=>{cur=orders.find(o=>o.id==id);view="detail";render()},
+  newOrder:()=>{cur=null;view="form";render()},
+  edit:()=>{view="form";render()},
+  addIt:()=>$("#its").insertAdjacentHTML("beforeend",itRow({n:"",p:""})),
+  setSt:s=>updateDoc(doc(db,"leatherOrders",cur.id),{status:s}),
+  save:async()=>{
+    const name=$("#fn").value.trim();if(!name)return alert("손님 이름을 적어주세요.");
+    const items=[...document.querySelectorAll("#its .row")].map(r=>({n:r.children[0].value.trim(),p:+r.children[1].value||0})).filter(i=>i.n||i.p);
+    const data={name,phone:$("#fp").value.trim(),type:$("#ft").value,memo:$("#fm").value.trim(),items,deposit:+$("#fd").value||0,received:$("#fr").value,due:$("#fe").value};
+    try{
+      if(cur?.id){const {id,...rest}=cur;await setDoc(doc(db,"leatherOrders",id),{...rest,...data});view="detail"}
+      else{const r=await addDoc(collection(db,"leatherOrders"),{...data,status:"접수",created:Date.now()});cur={id:r.id,...data,status:"접수"};view="detail"}
+      render();
+    }catch(e){alert("저장 실패: "+e.code)}
+  },
+  del:async()=>{if(!confirm("이 주문을 삭제할까요?"))return;await deleteDoc(doc(db,"leatherOrders",cur.id));cur=null;view="list";render()},
+  shareImg:async()=>{
+    const c=await html2canvas($("#rc"),{scale:2,backgroundColor:"#fff"});
+    c.toBlob(async b=>{
+      const f=new File([b],"견적서.png",{type:"image/png"});
+      if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f]})}catch(e){}}
+      else{const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="견적서.png";a.click();alert("이미지가 저장됐어요. 카톡에서 사진으로 보내세요.")}
+    });
+  },
+  shareTxt:async()=>{
+    const t=text(cur);
+    if(navigator.share){try{await navigator.share({text:t})}catch(e){}}
+    else location.href="sms:"+(cur.phone||"")+"?body="+encodeURIComponent(t);
+  }
+});
+render();
+</script></body></html>
